@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+    
+    html, body {
+    	height: 100%;
+    	background-color: #778899;
+    	margin: 0;
+    	padding: 0;
+    }
+    
+    #database{
+    background-color: #F5DEB3;
+    }
+    
+    #location{
+    background-color: #F5DEB3;
+    }
+    
+    #container{
+    margin-top: 20px;
+    
+    	width: 100%;
+    	height: 1000px;
+    	clear: both;
+    }
+    
+    #left{
+    	float: left;
+    	width: 320px;
+		background-color: green;
+    }
+    
+    #right{
+    	float: right;
+    	width: 200px;
+
+    }
+    
+    #map{
+
+    	overflow: hidden;
+    	margin: 0 auto;
+    	height: 600px;
+
+
+    }
+    
+    #info{
+    margin-left: 320px;
+    margin-top: 20px;
+    background-color: white;
+    position: absolute;
+    width: 65%;
+    height: 200px;
+    }
+    
+    #analysis{
+     margin-left: 20px;
+    margin-top: 20px;
+    width: 46%;
+    float: left;
+    text:bold;
+    text-align: left;
+    height: 200px;
+    
+    }
+    
+    #description{
+    margin-left: 20px;
+    margin-top: 20px;'
+    height: 200px;
+    width: 46%;
+    float: left;
+    text:bold;
+    text-align: left;
+ 	border-right: 3px solid #ccc;
+    
+    }
+    
+    span {
+  	display: inline-block;
+  	vertical-align: middle;
+  	line-height: normal;  
+  	    
+	}
+    
+    .C0Visualizer td {
+		border: 1px solid black;
+		width: 100px;
+		height: 90px;
+		text-align: center;
+	}
+	.C0VisualizerHeader td {
+		border: 0px;
+		height: 50px;
+		text-align: center;
+	}
+	
+    </style>
+  </head>
+  		<link rel="stylesheet" href="css/jquery-ui-1.10.1.custom.css">
+		<link rel="stylesheet" href="css/demo_table.css">
+		<link rel="stylesheet" href="css/jq.ext.css">
+		 <script src="js/jquery-1.9.1.js"></script>
+		<script src="js/jquery-ui-1.10.1.custom.js"></script>
+		<script src="js/jquery.sparkline.2.1.1.js"></script>
+		<script src="js/json2.js"></script>
+		<script src="js/jq.ext.tabs.js"></script>
+		
+		
+		<script>
+  var databaseArray = [{id: 'BTS1', arfcn: '70', bsic: '29'}
+  ,{id: 'BTS2', arfcn: '60', bsic: '28'}
+  ,{id: 'BTS3', arfcn: '65', bsic: '27'}
+  ,{id: 'BTS4', arfcn: '55', bsic: '26'}
+  ,{id: 'BTS5', arfcn: '75', bsic: '29'}];
+  
+  
+  
+  var locationArray = [{lat: '60.78064', lng: '10.67037'}
+  ,{lat: '60.76978', lng: '10.66677'}
+  ,{lat: '60.76991', lng: '10.69672'}
+  ,{lat: '60.78889', lng: '10.68462'}
+  ,{lat: '60.76086', lng: '10.65141'}];
+  
+  
+
+  
+  function displayDatabase(){
+	  var table1 = document.getElementById('database');
+	  for (var i = 0; i < databaseArray.length; i++){
+		  var bts = databaseArray[i];
+		  var row = document.createElement('tr');
+		  var properties = ['id', 'arfcn', 'bsic'];
+		  
+		  for(var j = 0; j < properties.length; j++){
+			  var cell = document.createElement('td');
+			  cell.innerHTML = bts[properties[j]];
+			  row.appendChild(cell);
+		  }
+		  table1.appendChild(row);
+	  }
+  }
+  
+  function displayLocations(){
+	  var table2 = document.getElementById('location');
+	  for (var i = 0; i < locationArray.length; i++){
+		  var location = locationArray[i];
+		  var row = document.createElement('tr');
+		  
+		  var properties = ['lat', 'lng'];
+		  
+		  for(var j = 0; j < properties.length; j++){
+			  var cell = document.createElement('td');
+			  cell.innerHTML = location[properties[j]];
+			  row.appendChild(cell);
+		  }
+		  table2.appendChild(row);
+	  }
+  }
+  
+  function getParameterByName(name, url) {
+	    if (!url) url = window.location.href;
+	    name = name.replace(/[\[\]]/g, "\\$&");
+	    var regex = new RegExp("[?&]" + name + "(=([^&#]*)|&|#|$)"),
+	        results = regex.exec(url);
+	    if (!results) return null;
+	    if (!results[2]) return '';
+	    return decodeURIComponent(results[2].replace(/\+/g, " "));
+   }
+  
+  function calculateDistanceBetweenTwoCoordinates(lat1,lon1,lat2,lon2){
+	  var R = 6371; //Radius of the earth in km
+	  var dLat = deg2rad(lat2-lat1);
+	  var dLon = deg2rad(lon2-lon1);
+	  var a =
+		  Math.sin(dLat/2)* Math.sin(dLat/2) +
+				  Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+				  Math.sin(dLon/2) * Math.sin(dLon/2);
+	  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+	  var d = R * c;
+	  return d;
+  }
+  
+  function deg2rad(deg){
+	  return deg * (Math.PI/180);
+  }
+  
+
+  </script>
+  
+  <body>
+  
+  <div id="container">
+  
+  		<div id="left">
+  		<table id="database" class="C0Visualizer">
+				<tbody>
+					<tr>
+						<td class="C0VisualizerHeader" colspan="3">
+							<table>
+								<tr>
+									<td colspan="3"><strong>Registered base stations</strong></td>
+								</tr>
+								<tr>
+									<td>BTS</td>
+									<td>ARFCN</td>
+									<td>BSIC</td>
+								</tr>
+								<tr>
+									<td id="11" style="height: 0px; !important"></td>
+									<td id="22" style="height: 0px; !important"></td>
+									<td id="33" style="height: 0px; !important"></td>
+						
+								</tr>
+							</table>
+						</td>
+					</tr>
+					</tbody>
+			</table>
+  		</div>
+	
+    	<div id="right">
+    	<table id="location" class="C0Visualizer">
+				<tbody>
+					<tr>
+						<td class="C0VisualizerHeader" colspan="2">
+							<table>
+								<tr>
+									<td colspan="2"><strong>Location</strong></td>
+								</tr>
+								<tr>
+									<td>Latitude</td>
+									<td>Longditude</td>
+								</tr>
+								<tr>
+									<td id="1" style="height: 0px; !important"></td>
+									<td id="2" style="height: 0px; !important"></td>
+						
+								</tr>
+							</table>
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</div>
+			
+    	
+    	<div id="map">
+    	
+    	</div>
+    	
+    	<div id="info">
+    		<div id="description">
+    			<h3>Description:</h3>
+    			<span>1. Blue circle: A estimated radius based on TA where the MS is loacted</span>
+    			<span>2. Yellow circle: Base station with the reported ARFCN/BSIC</span></br>
+    			<span>3. Red line indicates the distance between the serving BTS</br>and reported neighbour</span>
+    			
+    		</div>
+
+    	<span class="divider"></span>
+    		<div id="analysis">
+    			<h3>Analysis:</h3>
+    			<div id="info1"></div>
+    		</div>
+    	
+    	</div>
+    	
+    </div>
+    
+    
+    <script>
+    displayDatabase();
+    displayLocations();
+    </script>
+    <script>
+    	
+    var map;
+        window.initMap = function() {
+        	
+        	
+           var exists = false;
+           var urlarfcn = getParameterByName('arfcn');
+           var urlbsic = getParameterByName('bsic');
+           var ta = getParameterByName('ta');
+           var position = getParameterByName('index');
+           var bts;
+           var loc;
+           
+           for(var x = 0; x < databaseArray.length; x++){
+           		if(databaseArray[x].arfcn == urlarfcn && databaseArray[x].bsic == urlbsic){
+               		index = x;
+               		bts = databaseArray[x];
+              		loc = locationArray[x];
+               		exists = true;
+               	}	
+           	}
+               
+           if(exists){
+              var id1 = bts.id;
+              var arfcn1 = bts.arfcn;
+              var bsic1 = bts.bsic;
+              var latitude = parseFloat(loc.lat);
+              var longditude = parseFloat(loc.lng);
+           }
+
+        	
+	       var TA = parseInt(ta); // Hardcoded -- TODO: Dynamically add TA
+       	   var radius = 550;
+       	   if(TA != 0){
+       		  radius = radius * (TA+1);
+       	   }
+       	   
+      	    var BTS1 = {lat: 60.78064, lng: 10.67037};
+  			var BTS2 = {lat: 60.76978, lng: 10.66677};
+  			var BTS3 = {lat: 60.76991, lng: 10.69672};
+  			var BTS4 = {lat: 60.78889, lng: 10.68462};
+  			var BTS5 = {lat: 60.76086, lng: 10.65141};
+  			var btsspoofed = {lat: latitude, lng: longditude};
+  			//var btsspoofed = BTS4; //Hardcoded -- TODO: Dynamically add the spoofed BTS 
+  			
+  		    var mapOptions = {
+  		        zoom: 13,
+  		        center: BTS1
+  		    }
+  		    map = new google.maps.Map(document.getElementById('map'), mapOptions);
+  		    
+  		    var image = 'tower1.png';
+  		    var spyware = 'spyware.png';
+			
+  		    if(exists == true) {
+  		  		var circle1 = new google.maps.Circle({
+			  		strokeColor: '#778899',
+			  		strokeOpacity: 0.8,
+			  		strokeWeight: 2,
+			  		fillColor: '#778899',
+			  		fillOpacity: 0.35,
+			  		map: map,
+			  		center: BTS1,
+			  		radius: 500
+				});
+  		  		
+  		  		var circle2 = new google.maps.Circle({
+			  		strokeColor: '#FFD700',
+			  		strokeOpacity: 0.8,
+			  		strokeWeight: 2,
+			  		fillColor: '#FFD700',
+			  		fillOpacity: 0.35,
+			  		map: map,
+			  		center: btsspoofed,
+			  		radius: 350
+				});
+  		  		
+  		  		var line = new google.maps.Polyline({
+  		      		path: [
+  		          	new google.maps.LatLng(BTS1), 
+  		          	new google.maps.LatLng(btsspoofed)
+  		      		],
+  		      		strokeColor: "#FF0000",
+  		      		strokeOpacity: 1.0,
+  		      		strokeWeight: 2,
+  		      		map: map
+  		  		});
+  		  		
+
+  		  		var d = calculateDistanceBetweenTwoCoordinates(60.78064, 10.67037, latitude, longditude);
+  		  		var distance = d.toFixed(3);
+
+  		  	document.getElementById('info1').innerHTML = "Distance: " + distance + " km +/- " + radius + " meters.</br>Neighbour index: "+position+"";
+  		    } else {
+  		    	document.getElementById('info1').innerHTML = "This base station does not exist in the current geographical area.";
+  		    }
+  		     
+  		    var marker1 = new google.maps.Marker({
+  				position: BTS1,
+  				map: map,
+  				title: 'BTS: 1',
+  				icon: image
+  			});
+  			
+  			var marker2 = new google.maps.Marker({
+  				position: BTS2,
+  				map: map,
+  				title: 'BTS: 2',
+  				icon: image
+  			});
+  			
+  			var marker3 = new google.maps.Marker({
+  				position: BTS3,
+  				map: map,
+  				title: 'BTS: 3',
+  				icon: image
+  			});
+  			
+  			var marker4 = new google.maps.Marker({
+  				position: BTS4,
+  				map: map,
+  				title: 'BTS: 4',
+  				icon: image
+  			});
+  			
+  			var marker5 = new google.maps.Marker({
+  				position: BTS5,
+  				map: map,
+  				title: 'BTS: 5',
+  				icon: image
+  			});
+  			
+  			
+  			
+  		    var infowindow1 = new google.maps.InfoWindow({
+  			      content: "<B>BTS: 1 <br> ARFCN: 70 <br> BSIC: 29</B> " //BCC 5
+  			  });
+  		    var infowindow2 = new google.maps.InfoWindow({
+  			      content: "<B>BTS: 2 <br> ARFCN: 60 <br> BSIC: 28</B> " //BCC 4
+  			  });
+  		    var infowindow3 = new google.maps.InfoWindow({
+  			      content: "<B>BTS: 3 <br> ARFCN: 65 <br> BSIC: 27</B> " //BCC 3
+  			  });
+  		    var infowindow4 = new google.maps.InfoWindow({
+  			      content: "<B>BTS: 4 <br> ARFCN: 55 <br> BSIC: 26</B> " //BCC 2
+  			  });
+  		    
+  		    var infowindow5 = new google.maps.InfoWindow({
+  			      content: "<B>BTS: 5 <br> ARFCN: 75 <br> BSIC: 29</B> " //BCC 3
+  			  });
+  		    
+
+  			   //=====Eventlistener for InfoWindow
+  			  google.maps.event.addListener(marker1, 'click', function() {
+  			    infowindow1.open(map,marker1);
+  			  });
+  			   
+  			  google.maps.event.addListener(marker2, 'click', function() {
+  				    infowindow2.open(map,marker2);
+  				  });
+  			  
+  			  google.maps.event.addListener(marker3, 'click', function() {
+  				    infowindow3.open(map,marker3);
+  				  });
+  			  
+  			  google.maps.event.addListener(marker4, 'click', function() {
+  				    infowindow4.open(map,marker4);
+  				  });
+  			  
+  			  google.maps.event.addListener(marker5, 'click', function() {
+  				    infowindow5.open(map,marker5);
+  				  });
+  			  
+
+        }
+
+        
+
+      	</script>
+      	<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC2MZJYdv-aMoqWinYjoEqIpRyFS2rxIuE&callback=initMap"
+      async defer></script>
+  </body>
+</html>
+

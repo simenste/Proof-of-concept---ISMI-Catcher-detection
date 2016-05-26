@@ -1,0 +1,539 @@
+<html>
+	<head>
+		<meta name="viewport" content="initial-scale=1.0">
+		<meta charset="UTF-8">
+		<title>NodeManager Events API Visualizer</title>
+		<link rel="stylesheet" href="css/jquery-ui-1.10.1.custom.css">
+		<link rel="stylesheet" href="css/demo_table.css">
+		<link rel="stylesheet" href="css/jq.ext.css">
+		<link rel="stylesheet" href="css/alert-table.css">
+							
+
+		<style>
+		.C0Visualizer td {
+			border: 1px solid black;
+			width: 100px;
+			height: 90px;
+			text-align: center;
+		}
+		.C0VisualizerHeader td {
+			border: 0px;
+			height: 50px;
+			text-align: center;
+		}
+		
+		</style>
+
+		<script src="js/jquery-1.9.1.js"></script>
+		<script src="js/jquery-ui-1.10.1.custom.js"></script>
+		<script src="js/jquery.sparkline.2.1.1.js"></script>
+		<script src="js/json2.js"></script>
+		<script src="js/jq.ext.tabs.js"></script>
+		<script type="text/javascript">
+		
+
+		//
+		// Events Code
+		//
+		var alarm = new Array();
+		var storage = new Array();
+		var bcch_sacch = [75, 0, 0, 0, 0, 0]; // The BCCH(SACCH) transmitted by the BTS. 
+		var combo = [[55,26],[60,28], [65,27], [0,0]];
+
+		// buffer of incoming JSON text from events WebSocket
+		var rawEventBuffer = new String();
+
+		// how often to parse events from the raw incoming buffer in milliseconds
+		var eventParserRate = 20;
+
+		// stores complete events
+		var eventQueue = new Array();
+
+		// how often to process events in the queue in milliseconds
+		var eventProcessorRate = 20;
+
+		// chart samples
+		var CXTXSamples = {};
+
+		// max chart samples
+		var maxSamples = 30;
+
+		// last sample reading
+		var CXTXActivity = {};
+
+		// graphing fields
+		var fields = [
+			"RSSI",
+			"RSSP",
+			"actualMSPower",
+			"summedMSTiming",
+			"uplinkFrameErrorRate",
+			"RXLEVEL_FULL_dBm",
+			"RXQUALITY_FULL_BER"
+		];
+
+		// initialize an array of all zeros, used to setup flatlines in charts
+		function getZeroArray(size) {
+			var a = [];
+			for (var i = 0; i < size; i++) {
+				a[i] = null;
+			}
+			return a;
+		}
+
+		// initialize samples CXTXSamples object
+		function initSamples() {
+			CXTXActivity = [];
+			CXTXActivity[0] = [];
+			for (var i = 0; i < 7; i++) {
+				CXTXActivity[0][i] = new Date();
+			}
+
+			for (var i = 0; i < fields.length; i++) {
+				CXTXSamples[fields[i]] = [];
+				CXTXSamples[fields[i]][0] = [];
+				for (var ii = 0; ii < 7; ii++) {
+					CXTXSamples[fields[i]][0][ii] = getZeroArray(maxSamples);
+				}
+			}
+		}
+
+		// add a sample to the CXTXSamples object, auto-sizing on maxSamples
+		function addSample(C, T, field, value) {
+			CXTXSamples[field][C][T].push(value);
+			if (CXTXSamples[field][C][T].length > maxSamples) {
+				CXTXSamples[field][C][T].splice(0,1);
+			}
+		}
+
+		function registerTimeslotActivity(C, T) {
+			CXTXActivity[C][T] = new Date();
+		}
+
+		function timeslotReaper() {
+			var now = new Date();
+			for (var i = 0; i < 7; i++) {
+				var elapsed = now - CXTXActivity[0][i];
+				if (elapsed > 5000) {
+					clearTimeslot(0, i);
+				}
+			}
+			setTimeout(timeslotReaper, 1000);
+		}
+
+		function clearTimeslot(C, T) {
+			var CXTY = "C" + C + "T" + T;
+
+			$("#" + CXTY + "-type").html("");
+			$("#" + CXTY + "-imsi").html("");
+			$("#" + CXTY + "-arfcn").html("");
+
+			for (var i = 0; i < fields.length; i++) {
+				CXTXSamples[fields[i]][C][T] = getZeroArray(maxSamples);
+				$("#" + CXTY + "-" + fields[i] + "-chart").sparkline();
+				$("#" + CXTY + "-" + fields[i] + "-value").html("");
+			}
+		}
+
+		function clipWrite(id, string) {
+			var max = 20000;
+			var field = $('#' + id);
+			var text = field.val() + string;
+			var len = text.length;
+			if (len > max) {
+				text = text.substring(len - max);
+			}
+			field.val(text);
+			field.scrollTop(field[0].scrollHeight - field.height());
+		}
+
+		// parse events from the buffer
+		function eventParser() {
+			var delimiter = "\r\n\r\n";
+
+			// see if we have a complete event
+			var end = rawEventBuffer.indexOf(delimiter);
+			if (end != -1) {
+				// grab the event text and turn it into an object
+				var tmpEvent = "var eObject = " + rawEventBuffer.slice(0, end);
+				eval(tmpEvent);
+				// store the object in the queue for processing
+				eventQueue.push(eObject);
+				// remove the event text from the raw buffer
+				rawEventBuffer = rawEventBuffer.slice(end + delimiter.length);
+				// update the buffer length stat
+				$('#rawEventBufferLength').val(rawEventBuffer.length);
+			}
+
+			// schedule the parser to run again
+			setTimeout('eventParser()', eventParserRate);
+		}
+		
+		
+		function listAlarms(){
+			for(var j = 0; j < storage.length; j++){
+				for(var i = 0; i < combo.length; i++){
+					if(storage[j][0] !== combo[i][0] && storage[j][1] !== combo[i][1]){
+						if(alarm.length !== 0){
+							for(var d = 0; d < alarm.length; d++){
+								if(storage[j][0] !== alarm[d][0] && storage[j][1] !== alarm[d][1]){
+									alarm.push(new Array(storage[j][0], storage[j][1], storage[j][2], storage[j][3]));
+									$('#alarms tr:last').after('<tr class="pushable"><td>'+alarm[d][0]+'</td><td>'+alarm[d][1]+'</td><td>'+alarm[d][2]+'</td><td>'+alarm[d][3]+'</td></tr>');
+								}
+							}
+						} else {
+								alarm.push(new Array(storage[j][0], storage[j][1], storage[j][2], storage[j][3]));
+								$('#alarms tr:last').after('<tr class="pushable"><td>'+alarm[0][0]+'</td><td>'+alarm[0][1]+'</td><td>'+alarm[0][2]+'</td><td>'+alarm[0][3]+'</td></tr>');
+						}
+					}
+				}
+			}
+		}
+		
+		//dersom arfcn og bsic eksisterer i array alarm allerede, så skal den IKKE legges til. 
+		
+
+		// processed parsed events
+		function eventProcessor() {
+			// if there events to process
+			if (eventQueue.length) {
+
+				// chop one off the top
+				var message = eventQueue.shift();
+				var v;
+
+				// process PhysicalStatus event
+				if (message.name == "PhysicalStatus") {
+					// increment event counter
+					v = $('#physicalStatusEventLength');
+					v.val(parseInt(v.val()) + 1);
+
+					
+					var ncellcount = message.data.reports.numberofneighbors; //Number of neighbors
+					
+					if(ncellcount == 1){
+						var ta = message.data.burst.actualMSTimingAdvance;
+						$('#reports tr:last').after('<tr><td>'+message.timestamp+'</td><td>'+message.data.channel.ARFCN1+'</td><td>'+message.data.channel.IMSI+'</td><td>'+message.data.burst.actualMSPower+'</td><td>'+message.data.burst.actualMSTimingAdvance+'</br>'+(message.data.burst.actualMSTimingAdvance + message.data.burst.timingError)+'</td><td>'+message.data.burst.RSSI+'</td><td>'+message.data.reports.servingCell.RXLEVEL_FULL_dBm+'</td><td>'+message.data.reports.servingCell.RXQUALITY_FULL_BER+'</td><td>'+1+'<br>'+2+'</br>'+3+'</br>'+4+'</br>'+5+'</br>'+6+'</td><td>'+message.data.reports.neighboringCells[0].BCCH_FREQ+' ('+(bcch_sacch[0])+')'+'</br>-</br>-</br>-<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].BSIC+'</br>-</br>-</br>-<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].RXLEVEL_dBm+'</br>-</br>-</br>-<br>-</br>-</td></tr>');
+						
+						storage.push(new Array(bcch_sacch[0], message.data.reports.neighboringCells[0].BSIC, ta, 1));	
+					} else if(ncellcount == 2){
+						$('#reports tr:last').after('<tr><td>'+message.timestamp+'</td><td>'+message.data.channel.ARFCN1+'</td><td>'+message.data.channel.IMSI+'</td><td>'+message.data.burst.actualMSPower+'</td><td>'+message.data.burst.actualMSTimingAdvance+'</br>'+(message.data.burst.actualMSTimingAdvance + message.data.burst.timingError)+'</td><td>'+message.data.burst.RSSI+'</td><td>'+message.data.reports.servingCell.RXLEVEL_FULL_dBm+'</td><td>'+message.data.reports.servingCell.RXQUALITY_FULL_BER+'</td><td>'+1+'<br>'+2+'</br>'+3+'</br>'+4+'</br>'+5+'</br>'+6+'</td><td>'+message.data.reports.neighboringCells[0].BCCH_FREQ+' ('+(bcch_sacch[0])+')'+'</br>'+message.data.reports.neighboringCells[1].BCCH_FREQ+' ('+(bcch_sacch[1])+')'+'</br>-</br>-<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].BSIC+'</br>'+message.data.reports.neighboringCells[1].BSIC+'</br>-</br>-<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[1].RXLEVEL_dBm+'</br>-</br>-<br>-</br>-</td></tr>');					
+						for(var i = 0; i < 2; i++){
+							storage.push(new Array(bcch_sacch[i], message.data.reports.neighboringCells[i].BSIC, message.data.burst.actualMSTimingAdvance, 2));
+						}
+							
+					} else if(ncellcount == 3){
+						$('#reports tr:last').after('<tr><td>'+message.timestamp+'</td><td>'+message.data.channel.ARFCN1+'</td><td>'+message.data.channel.IMSI+'</td><td>'+message.data.burst.actualMSPower+'</td><td>'+message.data.burst.actualMSTimingAdvance+'</br>'+(message.data.burst.actualMSTimingAdvance + message.data.burst.timingError)+'</td><td>'+message.data.burst.RSSI+'</td><td>'+message.data.reports.servingCell.RXLEVEL_FULL_dBm+'</td><td>'+message.data.reports.servingCell.RXQUALITY_FULL_BER+'</td><td>'+1+'<br>'+2+'</br>'+3+'</br>'+4+'</br>'+5+'</br>'+6+'</td><td>'+message.data.reports.neighboringCells[0].BCCH_FREQ+' ('+(bcch_sacch[0])+')'+'</br>'+message.data.reports.neighboringCells[1].BCCH_FREQ+' ('+(bcch_sacch[1])+')'+'</br>'+message.data.reports.neighboringCells[2].BCCH_FREQ+' ('+(bcch_sacch[2])+')'+'</br>-<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].BSIC+'</br>'+message.data.reports.neighboringCells[1].BSIC+'</br>'+message.data.reports.neighboringCells[2].BSIC+'</br>-<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[1].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[2].RXLEVEL_dBm+'</br>-<br>-</br>-</td></tr>');
+						for(var i = 0; i < 3; i++){
+							storage.push(new Array(bcch_sacch[i], message.data.reports.neighboringCells[i].BSIC, message.data.burst.actualMSTimingAdvance, 3));
+						}
+					} else if(ncellcount == 4){
+						$('#reports tr:last').after('<tr><td>'+message.timestamp+'</td><td>'+message.data.channel.ARFCN1+'</td><td>'+message.data.channel.IMSI+'</td><td>'+message.data.burst.actualMSPower+'</td><td>'+message.data.burst.actualMSTimingAdvance+'</br>'+(message.data.burst.actualMSTimingAdvance + message.data.burst.timingError)+'</td><td>'+message.data.burst.RSSI+'</td><td>'+message.data.reports.servingCell.RXLEVEL_FULL_dBm+'</td><td>'+message.data.reports.servingCell.RXQUALITY_FULL_BER+'</td><td>'+1+'<br>'+2+'</br>'+3+'</br>'+4+'</br>'+5+'</br>'+6+'</td><td>'+message.data.reports.neighboringCells[0].BCCH_FREQ+' ('+(bcch_sacch[0])+')'+'</br>'+message.data.reports.neighboringCells[1].BCCH_FREQ+' ('+(bcch_sacch[1])+')'+'</br>'+message.data.reports.neighboringCells[2].BCCH_FREQ+' ('+(bcch_sacch[2])+')'+'</br>'+message.data.reports.neighboringCells[3].BCCH_FREQ+' ('+(bcch_sacch[3])+')'+'<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].BSIC+'</br>'+message.data.reports.neighboringCells[1].BSIC+'</br>'+message.data.reports.neighboringCells[2].BSIC+'</br>'+message.data.reports.neighboringCells[3].BSIC+'<br>-</br>-</td><td>'+message.data.reports.neighboringCells[0].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[1].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[2].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[3].RXLEVEL_dBm+'<br>-</br>-</td></tr>');
+						for(var i = 0; i < 4; i++){
+							storage.push(new Array(bcch_sacch[i], message.data.reports.neighboringCells[i].BSIC, message.data.burst.actualMSTimingAdvance, 4));
+						}
+					} else if(ncellcount == 5){
+						$('#reports tr:last').after('<tr><td>'+message.timestamp+'</td><td>'+message.data.channel.ARFCN1+'</td><td>'+message.data.channel.IMSI+'</td><td>'+message.data.burst.actualMSPower+'</td><td>'+message.data.burst.actualMSTimingAdvance+'</br>'+(message.data.burst.actualMSTimingAdvance + message.data.burst.timingError)+'</td><td>'+message.data.burst.RSSI+'</td><td>'+message.data.reports.servingCell.RXLEVEL_FULL_dBm+'</td><td>'+message.data.reports.servingCell.RXQUALITY_FULL_BER+'</td><td>'+1+'<br>'+2+'</br>'+3+'</br>'+4+'</br>'+5+'</br>'+6+'</td><td>'+message.data.reports.neighboringCells[0].BCCH_FREQ+' ('+(bcch_sacch[0])+')'+'</br>'+message.data.reports.neighboringCells[1].BCCH_FREQ+' ('+(bcch_sacch[1])+')'+'</br>'+message.data.reports.neighboringCells[2].BCCH_FREQ+' ('+(bcch_sacch[2])+')'+'</br>'+message.data.reports.neighboringCells[3].BCCH_FREQ+' ('+(bcch_sacch[3])+')'+'<br>'+message.data.reports.neighboringCells[4].BCCH_FREQ+' ('+(bcch_sacch[4])+')'+'</br>-</td><td>'+message.data.reports.neighboringCells[0].BSIC+'</br>'+message.data.reports.neighboringCells[1].BSIC+'</br>'+message.data.reports.neighboringCells[2].BSIC+'</br>'+message.data.reports.neighboringCells[3].BSIC+'<br>'+message.data.reports.neighboringCells[4].BSIC+'</br>-</td><td>'+message.data.reports.neighboringCells[0].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[1].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[2].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[3].RXLEVEL_dBm+'<br>'+message.data.reports.neighboringCells[4].RXLEVEL_dBm+'</br>-</td></tr>');
+						for(var i = 0; i < 5; i++){
+							storage.push(new Array(bcch_sacch[i], message.data.reports.neighboringCells[i].BSIC, message.data.burst.actualMSTimingAdvance, 5));
+						}
+					} else if(ncellcount == 6){
+						$('#reports tr:last').after('<tr><td>'+message.timestamp+'</td><td>'+message.data.channel.ARFCN1+'</td><td>'+message.data.channel.IMSI+'</td><td>'+message.data.burst.actualMSPower+'</td><td>'+message.data.burst.actualMSTimingAdvance+'</br>'+(message.data.burst.actualMSTimingAdvance + message.data.burst.timingError)+'</td><td>'+message.data.burst.RSSI+'</td><td>'+message.data.reports.servingCell.RXLEVEL_FULL_dBm+'</td><td>'+message.data.reports.servingCell.RXQUALITY_FULL_BER+'</td><td>'+1+'<br>'+2+'</br>'+3+'</br>'+4+'</br>'+5+'</br>'+6+'</td><td>'+message.data.reports.neighboringCells[0].BCCH_FREQ+' ('+(bcch_sacch[0])+')'+'</br>'+message.data.reports.neighboringCells[1].BCCH_FREQ+' ('+(bcch_sacch[1])+')'+'</br>'+message.data.reports.neighboringCells[2].BCCH_FREQ+' ('+(bcch_sacch[2])+')'+'</br>'+message.data.reports.neighboringCells[3].BCCH_FREQ+' ('+(bcch_sacch[3])+')'+'<br>'+message.data.reports.neighboringCells[4].BCCH_FREQ+' ('+(bcch_sacch[4])+')'+'</br>'+message.data.reports.neighboringCells[5].BCCH_FREQ+' ('+(bcch_sacch[5])+')'+'</td><td>'+message.data.reports.neighboringCells[0].BSIC+'</br>'+message.data.reports.neighboringCells[1].BSIC+'</br>'+message.data.reports.neighboringCells[2].BSIC+'</br>'+message.data.reports.neighboringCells[3].BSIC+'<br>'+message.data.reports.neighboringCells[4].BSIC+'</br>'+message.data.reports.neighboringCells[5].BSIC+'</td><td>'+message.data.reports.neighboringCells[0].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[1].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[2].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[3].RXLEVEL_dBm+'<br>'+message.data.reports.neighboringCells[4].RXLEVEL_dBm+'</br>'+message.data.reports.neighboringCells[5].RXLEVEL_dBm+'</td></tr>');
+						for(var i = 0; i < 6; i++){
+							storage.push(new Array(bcch_sacch[i], message.data.reports.neighboringCells[i].BSIC, message.data.burst.actualMSTimingAdvance, 6));
+						}
+					}
+					
+					listAlarms();
+					
+
+
+				// error if unknown event
+				} else {
+					v = $('#errorCount');
+					v.val(parseInt(v.val()) + 1);
+				}
+			}
+
+			// update the queue length stat
+			$('#eventQueueLength').val(eventQueue.length);
+
+			// schedule the processor to run again
+			setTimeout('eventProcessor()', eventProcessorRate);
+		}
+		
+
+
+		// connect to the events WebSocket and bind to events
+		function openBTSConnect() {
+
+			try {
+				openBTSSocket = new WebSocket("ws://" + top.location.hostname + ":8888/ws");
+
+				openBTSSocket.onopen = function() {
+					$("#openBTSState").html("connected");
+					eventParser();
+					eventProcessor();
+				}
+
+				openBTSSocket.onmessage = function(newMessage) {
+					clipWrite("openBTSEvents", newMessage.data);
+					rawEventBuffer = rawEventBuffer.concat(newMessage.data);
+				}
+
+				openBTSSocket.onclose = function() {
+					$("#openBTSState").html("disconnected");
+					setTimeout(openBTSConnect, 2000);
+				}
+
+			} catch(exception) {
+				alert("Caught exception in openBTSSocket() : " + exception);
+			}
+		}
+
+		$(document).ready(function(){
+
+			$("#tabs").tabs();
+
+			$("#clear").click(function(event){
+				$("#output").html("");
+			});
+
+			initSamples()
+			openBTSConnect();
+			timeslotReaper();
+		});
+		</script>
+
+	</head>
+	<body>
+		<div id="tabs">
+			<ul>
+				<li><a href="#tabs-1">Raw API Traffic</a></li>
+				<li><a href="#tabs-2">Neighbor Measurement reports</a></li>
+				<li><a href="#tabs-3">Scenario</a></li>
+			</ul>
+			
+			<div id="tabs-1">
+				<table>
+					<tr>
+						<td>
+							<textarea id="openBTSEvents" name="openBTSEvents" rows="20" cols="100"></textarea>
+						</td>
+					</tr>
+					<tr>
+						<td align="right">
+							STATE : <span id="openBTSState" name="openBTSState">uninitialized</span><br>
+							rawEventBufferLength : <input id="rawEventBufferLength" type="text" size="10" value="0"><br>
+							eventQueueLength : <input id="eventQueueLength" type="text" size="10" value="0"><br>
+							physicalStatusEventLength : <input id="physicalStatusEventLength" type="text" size="10" value="0"><br>
+							errorCount : <input id="errorCount" type="text" size="10" value="0">
+						</td>
+					</tr>
+				</table>
+			</div>
+			
+			<div id="tabs-2">
+			<div style="float: right; margin-right: 50px;">
+			<table id="alarms" class="C0Visualizer">
+				<tbody>
+					<tr>
+						<td class="C0VisualizerHeader" colspan="4">
+							<table>
+								<tr>
+									<td colspan="4"><strong>Alarms</strong></td>
+								</tr>
+								<tr>
+									<td>ARFCN</td>
+									<td>BSIC</td>
+									<td>TA</td>
+									<td>Position</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td id="arfcn_alarm" style="height: 0px; !important"></td>
+						<td id="bsic_alarm" style="height: 0px; !important"></td>
+						<td id="ta_alarm" style="height: 0px; !important"></td>
+						<td id="position_alarm" style="height: 0px; !important"></td>
+						
+					</tr>
+					</tbody>
+				</table>
+
+			</div>
+				<table id="reports" class="C0Visualizer">
+				<tbody>
+					<tr>
+						<td class="C0VisualizerHeader">BTS: 1</td>
+						<td class="C0VisualizerHeader" colspan="1">
+							<table>
+								<tr>
+									<td colspan="1"><strong>ID</strong></td>
+								</tr>
+								<tr>
+									<td>ARFCN</td>
+								</tr>
+							</table>
+						</td>
+						<td class="C0VisualizerHeader" colspan="3">
+							<table>
+								<tr>
+									<td colspan="3"><strong>Handset</strong></td>
+								</tr>
+								<tr>
+									<td>IMSI</td>
+									<td>Power</td>
+									<td>TimingAdvance + TimingError</td>
+								</tr>
+							</table>
+						</td>
+						<td class="C0VisualizerHeader" colspan="1">
+							<table>
+								<tr>
+									<td colspan="1"><strong>Uplink</strong></td>
+								</tr>
+								<tr>
+									<td>RSSI</td>
+								</tr>
+							</table>
+						</td>
+						<td class="C0VisualizerHeader" colspan="2">
+							<table>
+								<tr>
+									<td colspan="2"><strong>Downlink</strong></td>
+								</tr>
+								<tr>
+									<td>RXLEVEL<br>FULL dBM</td>
+									<td>RXQUALITY<br>FULL BER</td>
+								</tr>
+							</table>
+						</td>
+						<td class="C0VisualizerHeader" colspan="4">
+							<table>
+								<tr>
+									<td colspan="4"><strong>Neighbor Measurement</strong></td>
+								</tr>
+								<tr>
+									<td id="t1">Index</td>
+									<td id="t2">BCCH-FREQ-NCELL</td>
+									<td id="t3">BSIC-NCELL</td>
+									<td id="t4">RXLEV-NCELL</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td id="header" style="height: 0px; !important"></td>
+						<td id="arfcn" style="height: 0px; !important"></td>
+						<td id="imsi" style="height: 0px; !important"></td>
+						<td id="actualMSPower" style="height: 0px; !important"></td>
+						<td id="summedMSTiming" style="height: 0px; !important"></td>
+						<td id="RSSI" style="height: 0px; !important"></td>
+						<td id="RXLEVEL_FULL_dBm" style="height: 0px; !important"></td>
+						<td id="RXQUALITY_FULL_BER" style="height: 0px; !important"></td>
+						<td id="neighborindex" style="height: 0px; !important"></td>
+						<td id="bcch-freq-ncell" style="height: 0px; !important"></td>
+						<td id="bsic-ncell" style="height: 0px; !important"></td>
+						<td id="rxlev-ncell" style="height: 0px; !important"></td>
+						
+						
+					</tr>
+					</tbody>
+				</table>
+			</div>
+			
+			
+			<div id="tabs-3">
+			<div id="left" style="float: left; margin-top: 100px;">
+				<iframe src="visualizer2.html" width="1000" height="600"></iframe>
+				</br>
+				<b>Neighbor list (BA(SACCH)): [49,50,51,52,53,54,55,60,61,62,63,64,65,70,71,72,73,74,75]</b>
+			</div>
+			<div id="right" style="float: right; margin-top: 100px;">
+			
+			<table id="info" class="C0Visualizer">
+				<tbody>
+					<tr>
+						<td class="C0VisualizerHeader" colspan="4">
+							<table>
+								<tr>
+									<td colspan="4"><strong>BTSs</strong></td>
+								</tr>
+								<tr>
+									<td>BTS</td>
+									<td>ARFCN</td>
+									<td>BSIC</td>
+									<td>Receives Measurement reports about neighbor:</td>
+								</tr>
+							</table>
+						</td>
+					</tr>
+					<tr>
+						<td>1</td>
+						<td>70</td>
+						<td>29</td>
+						<td>2, 3, 4</td>
+						
+					</tr>
+					
+					<tr>
+						<td>2</td>
+						<td>60</td>
+						<td>28</td>
+						<td>1, 3, 4, 5</td>
+					</tr>
+					
+					<tr>
+						<td>3</td>
+						<td>65</td>
+						<td>27</td>
+						<td>1, 2, 4, 5</td>
+					</tr>
+					
+					
+					<tr>
+						<td>4</td>
+						<td>55</td>
+						<td>26</td>
+						<td>1, 2, 3</td>
+					</tr>
+					
+					<tr>
+						<td>5</td>
+						<td>75</td>
+						<td>29</td>
+						<td>2, 3</td>
+					</tr>
+					
+					<tr>
+						<td>IMSI Catcher</td>
+						<td>75</td>
+						<td>29</td>
+						<td>-</td>
+					</tr>
+					</tbody>
+				</table>
+			</div>
+			
+			</div>
+			
+		</div>
+		
+		<script>
+
+		$("#alarms").on('click', 'tr.pushable', function(){
+			var row = $(this).index()+1;
+			var arfcn = $(this).find("td:first").html();
+			var bsic = $(this).find("td:nth-child(2)").html();
+			var ta = $(this).find("td:nth-child(3)").html();
+			var index = $(this).find("td:nth-child(4)").html();
+			var url = "http://10.168.86.133:8000/visualizer3.html?arfcn="+arfcn+"&bsic="+bsic+"&ta="+ta+"&index="+index+"";
+			window.open(url, '_blank');
+			
+		});
+
+		</script>
+	</body>
+<html>

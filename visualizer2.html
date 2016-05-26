@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+	
+    <div id="map" style="width: 1000px; height: 600px;"></div>
+    <script>
+      var map;
+      function initMap() {
+    	    var BTS1 = {lat: 60.78064, lng: 10.67037};
+			var BTS2 = {lat: 60.76978, lng: 10.66677};
+			var BTS3 = {lat: 60.76991, lng: 10.69672};
+			var BTS4 = {lat: 60.78889, lng: 10.68462};
+			var BTS5 = {lat: 60.76086, lng: 10.65141};
+			var IMSICatcher = {lat: 60.78057, lng: 10.68312};
+			var IMSICatcher2 = {lat: 60.78689, lng: 10.66861};
+			var BTS8 = {lat: 60.79652, lng: 10.66857};
+			
+		    var mapOptions = {
+		        zoom: 13,
+		        center: BTS1
+		    }
+		    var map = new google.maps.Map(document.getElementById('map'), mapOptions);
+		    var image = 'tower1.png';
+		    var spyware = 'spyware.png';
+
+		     
+		    var marker1 = new google.maps.Marker({
+				position: BTS1,
+				map: map,
+				title: 'BTS: 1',
+				icon: image
+			});
+			
+			var marker2 = new google.maps.Marker({
+				position: BTS2,
+				map: map,
+				title: 'BTS: 2',
+				icon: image
+			});
+			
+			var marker3 = new google.maps.Marker({
+				position: BTS3,
+				map: map,
+				title: 'BTS: 3',
+				icon: image
+			});
+			
+			var marker4 = new google.maps.Marker({
+				position: BTS4,
+				map: map,
+				title: 'BTS: 4',
+				icon: image
+			});
+			
+			var marker5 = new google.maps.Marker({
+				position: BTS5,
+				map: map,
+				title: 'BTS: 5',
+				icon: image
+			});
+			
+			var marker6 = new google.maps.Marker({
+				position: IMSICatcher,
+				map: map,
+				title: 'IMSI Catcher',
+				icon: spyware
+			});
+			
+//			var marker7 = new google.maps.Marker({
+//				position: IMSICatcher2,
+//				map: map,
+//				title: 'IMSI Catcher',
+//				icon: spyware
+//			});
+//			
+//			var marker8 = new google.maps.Marker({
+//				position: BTS8,
+//				map: map,
+//				title: 'BTS: 6',
+//				icon: image
+//			});
+			
+			
+		    var infowindow1 = new google.maps.InfoWindow({
+			      content: "<B>BTS: 1 <br> ARFCN: 70 <br> BSIC: 29</B> " //BCC 5
+			  });
+		    var infowindow2 = new google.maps.InfoWindow({
+			      content: "<B>BTS: 2 <br> ARFCN: 60 <br> BSIC: 28</B> " //BCC 4
+			  });
+		    var infowindow3 = new google.maps.InfoWindow({
+			      content: "<B>BTS: 3 <br> ARFCN: 65 <br> BSIC: 27</B> " //BCC 3
+			  });
+		    var infowindow4 = new google.maps.InfoWindow({
+			      content: "<B>BTS: 4 <br> ARFCN: 55 <br> BSIC: 26</B> " //BCC 2
+			  });
+		    
+		    var infowindow5 = new google.maps.InfoWindow({
+			      content: "<B>BTS: 5 <br> ARFCN: 75 <br> BSIC: 29</B> " //BCC 3
+			  });
+		    
+	        var infowindow6 = new google.maps.InfoWindow({
+			      content: "<B>IMSI Catcher <br> ARFCN: 75 <br> BSIC: 29</B> " //BCC 3
+			  });
+		    
+//		    var infowindow7 = new google.maps.InfoWindow({
+//			      content: "<B>IMSI Catcher <br> ARFCN: 60 <br> BSIC: 28</B> " //BCC 3
+//			  });
+//		    
+//		    var infowindow8 = new google.maps.InfoWindow({
+//			      content: "<B>IMSI Catcher <br> ARFCN: X <br> BSIC: X</B> " //BCC 3
+//			  });
+
+			   //=====Eventlistener for InfoWindow
+			  google.maps.event.addListener(marker1, 'click', function() {
+			    infowindow1.open(map,marker1);
+			  });
+			   
+			  google.maps.event.addListener(marker2, 'click', function() {
+				    infowindow2.open(map,marker2);
+				  });
+			  
+			  google.maps.event.addListener(marker3, 'click', function() {
+				    infowindow3.open(map,marker3);
+				  });
+			  
+			  google.maps.event.addListener(marker4, 'click', function() {
+				    infowindow4.open(map,marker4);
+				  });
+			  
+			  google.maps.event.addListener(marker5, 'click', function() {
+				    infowindow5.open(map,marker5);
+				  });
+			  
+			  google.maps.event.addListener(marker6, 'click', function() {
+				    infowindow6.open(map,marker6);
+				  });
+
+//			  google.maps.event.addListener(marker7, 'click', function() {
+//				    infowindow7.open(map,marker7);
+//				  });
+
+      }
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC2MZJYdv-aMoqWinYjoEqIpRyFS2rxIuE&callback=initMap"
+    async defer></script>
+  </body>
+</html>
