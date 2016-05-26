@@ -1,0 +1,24 @@
+table#alarms {
+	border-collapse: collapse;
+}
+
+#alarms tr.pushable{
+	background-color: #eee;
+	border-top: 1px solid #fff;
+	color:red; font-weight:bold;
+	
+}
+
+#alarms tr.pushable:hover {
+	background-color: #ccc;
+}
+
+#alarms th {
+	background-color: #fff;
+}
+#alarms th, #alarms td {
+	padding: 3px 5px;
+}
+#alarms td:hover {
+	cursor: pointer;
+}
