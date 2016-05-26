@@ -1,6 +1,6 @@
 Notes
 =====
-A very simple and staticly configured web application to detect IMSI Catchers using measurement reports in a predefined scenario. 
+A very simple and staticly configured web application to detect IMSI Catchers using measurement reports in a predefined scenario. There may currently be some staticly configured local IP-addresses. The project is currently written for localhost only.
 
 The project is based on a proof-of-conecpt project by RangeNetworks: https://github.com/RangeNetworks/presentations
 
