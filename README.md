@@ -4,16 +4,13 @@ A very simple and staticly configured web application to detect IMSI Catchers us
 
 The project is based on a proof-of-conecpt project by RangeNetworks: https://github.com/RangeNetworks/presentations
 
-Code and libraries used:
-
- * http://arborjs.org
- * http://smoothiecharts.org
- * http://omnipotent.net/jquery.sparkline/#s-about
- * https://github.com/deckarep/TornadoZeroMQ-WS-Demo
- * http://jquery.com
- * http://jqueryui.com
-
-Enjoy!
+Requirements
+=====
+* The proof of concept requires two instances of OpenBTS, one that acts as an IMSI Catcher and one that operates as a valid GSM base station receiving the neighbor measurement reports.
+* The IMSI Catcher is configured with an ARFCN of 75 and bsic of 29.
+* The valid BTS is configured with a ARFCN of 70 and bsic of 29. 
+* The two OpenBTS instances must be configured as neighbors in OpenBTS.
+* 
 
 Setup
 =====
