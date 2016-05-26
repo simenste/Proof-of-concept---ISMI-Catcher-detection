@@ -9,8 +9,8 @@ Requirements
 * The proof of concept requires two instances of OpenBTS, one that acts as an IMSI Catcher and one that operates as a valid GSM base station receiving the neighbor measurement reports.
 * The IMSI Catcher is configured with an ARFCN of 75 and bsic of 29.
 * The valid BTS is configured with a ARFCN of 70 and bsic of 29. 
-* The two OpenBTS instances must be configured as neighbors in OpenBTS.
-* 
+* The two OpenBTS instances must be configured as neighbors.
+* The web application must be run on the computer with the legitimate GSM base station
 
 Setup
 =====
